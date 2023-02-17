@@ -1,12 +1,14 @@
 use std::io::BufRead;
 
+use either::Either::Left;
+
 use crate::{crontab, env::get_env_path};
 
 const GROUP_REPO: &str = "_repo";
 
 fn filter_by_group<'a>(tabs: &'a Vec<crontab::Item>, group: &str) -> Vec<&'a crontab::Item> {
     tabs.iter()
-        .filter(|i| i.args.as_ref().map_or(false, |a| a.group == group))
+        .filter(|i| i.args.as_ref().is_left() && i.args.as_ref().unwrap_left().group == group)
         .collect()
 }
 
@@ -134,9 +136,10 @@ pub fn add(
     branch: &str,
     force_clone: bool,
 ) -> Result<(), std::io::Error> {
-    let f = tabs
+    let repo_tabs = list(tabs);
+    let f = repo_tabs
         .iter()
-        .find(|i| i.args.as_ref().map_or(false, |a| a.name == repo));
+        .find(|i| i.args.as_ref().unwrap_left().name == repo);
 
     if f.is_some() {
         return Err(std::io::Error::new(
@@ -159,7 +162,7 @@ pub fn add(
             branch,
             std::env::current_exe().unwrap().to_str().unwrap()
         ),
-        args: Some(crontab::ItemArgs {
+        args: Left(crontab::ItemArgs {
             group: GROUP_REPO.to_string(),
             name: repo.to_string(),
             repo_args: Some(crontab::RepoArgs {
@@ -182,7 +185,7 @@ pub fn add(
                 resolve_to_abspath(&repo_path).unwrap(),
                 f
             ),
-            args: Some(crontab::ItemArgs {
+            args: Left(crontab::ItemArgs {
                 group: repo.to_string(),
                 name: f.to_string(),
                 repo_args: None,
@@ -203,9 +206,10 @@ pub fn rm_by_repo(
     let res = tabs
         .iter()
         .filter(|i| {
-            i.args.as_ref().map_or(true, |a| {
-                !((a.group == GROUP_REPO && a.name == repo) || &a.group == repo)
-            })
+            i.args
+                .as_ref()
+                .map_left(|a| !((a.group == GROUP_REPO && a.name == repo) || &a.group == repo))
+                .left_or(true)
         })
         .cloned()
         .collect();
@@ -235,7 +239,7 @@ pub fn rm_by_index(
     }
     let t = t.unwrap();
 
-    let repo = &t.args.as_ref().unwrap().name;
+    let repo = &t.args.as_ref().unwrap_left().name;
     Ok(rm_by_repo(tabs, repo, work_dir, true))
 }
 

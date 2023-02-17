@@ -1,3 +1,4 @@
+use either::Either;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -20,7 +21,7 @@ pub struct ItemArgs {
 pub struct Item {
     pub schedule: String,
     pub cmd: String,
-    pub args: Option<ItemArgs>,
+    pub args: Either<ItemArgs, String>,
 }
 
 pub fn get() -> Result<Vec<Item>, std::io::Error> {
@@ -66,7 +67,7 @@ pub fn get() -> Result<Vec<Item>, std::io::Error> {
             Item {
                 schedule: schedule.to_string(),
                 cmd: cmd.to_string(),
-                args,
+                args: args.map_or_else(|| Either::Right(block.to_string()), Either::Left),
             }
         })
         .collect::<Vec<_>>());
@@ -76,14 +77,14 @@ fn gen_crontab_str(items: Vec<Item>) -> String {
     let mut buf = String::new();
 
     for item in items {
-        let args = serde_json::to_string(&item.args).unwrap();
-        let line = if item.args.is_some() {
+        let line = if item.args.is_left() {
+            let args = serde_json::to_string(&item.args.unwrap_left()).unwrap();
             format!(
                 "# @light-dragon: {}\n{} {}\n",
                 args, item.schedule, item.cmd
             )
         } else {
-            format!("{} {}\n", item.schedule, item.cmd)
+            format!("{}\n", item.args.unwrap_right())
         };
         buf += &line;
     }

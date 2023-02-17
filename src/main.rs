@@ -92,10 +92,10 @@ fn main() {
                     "{}\t{}\t{}\t{}",
                     i,
                     repo.schedule,
-                    repo.args.as_ref().unwrap().name,
+                    repo.args.as_ref().unwrap_left().name,
                     repo.args
                         .as_ref()
-                        .unwrap()
+                        .unwrap_left()
                         .repo_args
                         .as_ref()
                         .unwrap()
@@ -109,7 +109,7 @@ fn main() {
 
             let mut tabs = tabs.clone();
             for repo in repos {
-                let args = repo.args.as_ref().unwrap();
+                let args = repo.args.as_ref().unwrap_left();
                 let repo_args = args.repo_args.as_ref().unwrap();
                 tabs = repo::rm_by_repo(&tabs, &args.name, &cli.work_dir, false);
 
