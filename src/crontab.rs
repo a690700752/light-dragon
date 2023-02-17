@@ -8,6 +8,7 @@ use std::{io::Write, process::Command};
 pub struct RepoArgs {
     pub whitelist: String,
     pub branch: String,
+    pub violence: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

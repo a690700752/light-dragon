@@ -94,10 +94,12 @@ fn find_files_by_regex(dir: &str, regex: &str) -> Result<Vec<String>, std::io::E
     Ok(files)
 }
 
-fn find_cron_in_file(file: &str) -> Result<String, std::io::Error> {
+fn find_cron_in_file(file: &str, violence: bool) -> Result<String, std::io::Error> {
     let file = std::fs::File::open(file)?;
     let reader = std::io::BufReader::new(file);
-    let re = regex::Regex::new(r"@cron: (\S* \S* \S* \S* \S*)").unwrap();
+    let re = regex::Regex::new(
+        if violence {r"(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\d+(ns|us|µs|ms|s|m|h))+)|((((\d+,)+\d+|(\d+(\/|-)\d+)|\d+|\*) ?){5,7})"} 
+        else {r"@cron +(\S* \S* \S* \S* \S*)"}).unwrap();
     for line in reader.lines() {
         let line = line?;
         if re.is_match(&line) {
@@ -111,11 +113,15 @@ fn find_cron_in_file(file: &str) -> Result<String, std::io::Error> {
     ))
 }
 
-fn find_cron_files(dir: &str, whitelist: &str) -> Result<Vec<(String, String)>, std::io::Error> {
+fn find_cron_files(
+    dir: &str,
+    whitelist: &str,
+    violence: bool,
+) -> Result<Vec<(String, String)>, std::io::Error> {
     let files = find_files_by_regex(&dir, whitelist)?;
     let files: Vec<_> = files
         .iter()
-        .map(|f| (f, find_cron_in_file(&format!("{}/{}", dir, f))))
+        .map(|f| (f, find_cron_in_file(&format!("{}/{}", dir, f), violence)))
         .filter(|(f, cron)| {
             if cron.is_ok() {
                 println!("Info: found cron for file {}", f);
@@ -135,6 +141,7 @@ pub fn add(
     work_dir: &str,
     branch: &str,
     force_clone: bool,
+    violence: bool,
 ) -> Result<(), std::io::Error> {
     let repo_tabs = list(tabs);
     let f = repo_tabs
@@ -151,7 +158,7 @@ pub fn add(
     let repo_path = format!("{}/{}", work_dir, get_repo_name(repo));
     clone_repo(repo, &repo_path, branch, force_clone)?;
 
-    let files = find_cron_files(&repo_path, whitelist)?;
+    let files = find_cron_files(&repo_path, whitelist, violence)?;
 
     let item = crontab::Item {
         schedule: schedule.to_string(),
@@ -168,6 +175,7 @@ pub fn add(
             repo_args: Some(crontab::RepoArgs {
                 whitelist: whitelist.to_string(),
                 branch: branch.to_string(),
+                violence,
             }),
         }),
     };

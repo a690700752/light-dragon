@@ -36,6 +36,9 @@ enum Commands {
 
         #[arg(short, long, default_value = "master")]
         branch: String,
+
+        #[arg(short, long, default_value = "false")]
+        violence: bool,
     },
     /// Remove repo
     RepoRm { index: usize },
@@ -64,6 +67,7 @@ fn main() {
             whitelist,
             schedule,
             branch,
+            violence,
         } => {
             let mut tabs = crontab::get().unwrap();
             repo::add(
@@ -74,6 +78,7 @@ fn main() {
                 &cli.work_dir,
                 &branch,
                 true,
+                violence,
             )
             .unwrap();
             crontab::set(tabs).unwrap();
@@ -121,6 +126,7 @@ fn main() {
                     &cli.work_dir,
                     &repo_args.branch,
                     false,
+                    repo_args.violence,
                 )
                 .unwrap();
             }
