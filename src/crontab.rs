@@ -3,33 +3,24 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{io::Write, process::Command};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RepoArgs {
+    pub whitelist: String,
+    pub branch: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ItemArgs {
-    group: Option<String>,
-    name: Option<String>,
+    pub group: String,
+    pub name: String,
+    pub repo_args: Option<RepoArgs>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Item {
-    schedule: String,
-    cmd: String,
-    args: Option<ItemArgs>,
-}
-
-impl Item {
-    pub fn new(schedule: String, cmd: String, args: Option<ItemArgs>) -> Self {
-        Self {
-            schedule,
-            cmd,
-            args,
-        }
-    }
-}
-
-enum Type {
-    Both,
-    LightDragon,
-    Other,
+    pub schedule: String,
+    pub cmd: String,
+    pub args: Option<ItemArgs>,
 }
 
 pub fn get() -> Result<Vec<Item>, std::io::Error> {
@@ -72,7 +63,11 @@ pub fn get() -> Result<Vec<Item>, std::io::Error> {
             let parts = last_line.split_ascii_whitespace().collect::<Vec<_>>();
             let schedule = &parts[0..5].join(" ");
             let cmd = &parts[5..].join(" ");
-            Item::new(schedule.to_string(), cmd.to_string(), args)
+            Item {
+                schedule: schedule.to_string(),
+                cmd: cmd.to_string(),
+                args,
+            }
         })
         .collect::<Vec<_>>());
 }
