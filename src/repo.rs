@@ -98,13 +98,12 @@ fn find_cron_in_file(file: &str, violence: bool) -> Result<String, std::io::Erro
     let file = std::fs::File::open(file)?;
     let reader = std::io::BufReader::new(file);
     let re = regex::Regex::new(
-        if violence {r"(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\d+(ns|us|µs|ms|s|m|h))+)|((((\d+,)+\d+|(\d+(\/|-)\d+)|\d+|\*) ?){5,7})"} 
-        else {r"@cron +(\S* \S* \S* \S* \S*)"}).unwrap();
+        &((if violence {""} else {r"@cron +"} ).to_string() + r"(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\d+(ns|us|µs|ms|s|m|h))+)|((((\d+,)+\d+|(\d+(\/|-)\d+)|\d+|\*) ?){5,7})")).unwrap();
     for line in reader.lines() {
         let line = line?;
         if re.is_match(&line) {
             let cap = re.captures(&line).unwrap();
-            return Ok(cap.get(1).unwrap().as_str().to_string());
+            return Ok(cap.get(1).unwrap().as_str().to_string().trim().to_string());
         }
     }
     Err(std::io::Error::new(
