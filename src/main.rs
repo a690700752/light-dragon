@@ -10,7 +10,7 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    #[arg(short, long, default_value = "./light-dragon-work")]
+    #[arg(short, long, default_value = "/var/lib/light-dragon")]
     work_dir: String,
 }
 

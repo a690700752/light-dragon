@@ -92,6 +92,38 @@ fn find_files_by_regex(dir: &str, regex: &str) -> Result<Vec<String>, std::io::E
     Ok(files)
 }
 
+fn has_shebang(file: &str) -> Result<bool, std::io::Error> {
+    let file = std::fs::File::open(file)?;
+    let reader = std::io::BufReader::new(file);
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with("#!") {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn gen_launcher(file: &str) -> String {
+    // detect by suffix
+    let suffix = std::path::Path::new(file)
+        .extension()
+        .unwrap()
+        .to_str()
+        .unwrap();
+    let suffix = suffix.to_lowercase();
+
+    if suffix == "py" {
+        "/usr/bin/env python3"
+    } else if suffix == "js" {
+        "/usr/bin/env node"
+    } else {
+        "/bin/sh"
+    }
+    .to_string()
+}
+
 fn find_cron_in_file(file: &str, violence: bool) -> Result<String, std::io::Error> {
     let filename = std::path::Path::new(file)
         .file_name()
@@ -208,13 +240,20 @@ pub fn add(
         println!("Warning: no files added in repo")
     }
     for (f, cron) in files {
+        let file_path = format!("{}/{}", resolve_to_abspath(&repo_path).unwrap(), f);
+        let shebang = has_shebang(&file_path)?;
+
         let item = crontab::Item {
             schedule: cron,
             cmd: format!(
-                ". {} && {}/{}",
+                ". {} && {} {}",
                 get_env_path(work_dir),
-                resolve_to_abspath(&repo_path).unwrap(),
-                f
+                if shebang {
+                    "".to_string()
+                } else {
+                    gen_launcher(&f)
+                },
+                file_path
             ),
             args: Left(crontab::ItemArgs {
                 group: repo.to_string(),
