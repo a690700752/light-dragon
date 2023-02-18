@@ -13,9 +13,7 @@ fn filter_by_group<'a>(tabs: &'a Vec<crontab::Item>, group: &str) -> Vec<&'a cro
 }
 
 fn resolve_to_abspath(path: &str) -> Result<String, std::io::Error> {
-    let path = std::path::Path::new(path);
-    let path = path.canonicalize()?;
-    Ok(path.to_str().unwrap().to_string())
+    std::fs::canonicalize(path).map(|p| p.to_str().unwrap().to_string())
 }
 
 pub fn list(tabs: &Vec<crontab::Item>) -> Vec<&crontab::Item> {
@@ -95,17 +93,43 @@ fn find_files_by_regex(dir: &str, regex: &str) -> Result<Vec<String>, std::io::E
 }
 
 fn find_cron_in_file(file: &str, violence: bool) -> Result<String, std::io::Error> {
-    let file = std::fs::File::open(file)?;
-    let reader = std::io::BufReader::new(file);
-    let re = regex::Regex::new(
-        &((if violence {""} else {r"@cron +"} ).to_string() + r"(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\d+(ns|us|µs|ms|s|m|h))+)|((((\d+,)+\d+|(\d+(\/|-)\d+)|\d+|\*) ?){5,7})")).unwrap();
-    for line in reader.lines() {
-        let line = line?;
-        if re.is_match(&line) {
-            let cap = re.captures(&line).unwrap();
-            return Ok(cap.get(1).unwrap().as_str().to_string().trim().to_string());
+    let filename = std::path::Path::new(file)
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap();
+
+    let mut re_list = vec![];
+    if !violence {
+        re_list.push((r"@cron +(.*)".to_string(), 1));
+    } else {
+        let binding = r#"[^\d\*]*(([\d\*]*[\*-/,\d]*[\d\*] ){4,5}[\d\*]*[\*-/,\d]*[\d\*])( |,|").*"#
+            .to_string() + filename;
+        re_list.push((binding, 1));
+
+        re_list.push((r"cron:(.*)".to_string(), 1));
+        re_list.push((r#"cron "(.*)""#.to_string(), 1));
+    }
+
+    for (re, idx) in re_list {
+        let re = regex::Regex::new(&re).unwrap();
+        let file = std::fs::File::open(file)?;
+        let reader = std::io::BufReader::new(file);
+        for line in reader.lines() {
+            let line = line?;
+            if re.is_match(&line) {
+                let cap = re.captures(&line).unwrap();
+                return Ok(cap
+                    .get(idx)
+                    .unwrap()
+                    .as_str()
+                    .to_string()
+                    .trim()
+                    .to_string());
+            }
         }
     }
+
     Err(std::io::Error::new(
         std::io::ErrorKind::Other,
         "no cron found in file",

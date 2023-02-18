@@ -77,7 +77,7 @@ fn main() {
                 &whitelist,
                 &cli.work_dir,
                 &branch,
-                true,
+                false,
                 violence,
             )
             .unwrap();

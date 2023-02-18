@@ -5,7 +5,6 @@ use std::{
 
 pub fn add(work_dir: &str, name: &str, value: &str) -> Result<(), std::io::Error> {
     let mut env_file = std::fs::OpenOptions::new()
-        .create(true)
         .append(true)
         .open(get_env_path(work_dir))?;
     env_file.write_all(format!("export {}={}\n", name, value).as_bytes())?;
@@ -41,7 +40,6 @@ pub fn rm(work_dir: &str, name: &str) -> Result<(), std::io::Error> {
     }
 
     let mut env_file = std::fs::OpenOptions::new()
-        .create(true)
         .write(true)
         .truncate(true)
         .open(get_env_path(work_dir))?;
@@ -52,8 +50,14 @@ pub fn rm(work_dir: &str, name: &str) -> Result<(), std::io::Error> {
 }
 
 pub fn get_env_path(work_dir: &str) -> String {
-    std::path::Path::new(&format!("{}/{}", work_dir, "light-dragon.env"))
-        .canonicalize()
+    // crate file if not exists
+    let file_path = &format!("{}/{}", work_dir, "light-dragon.env");
+
+    if !std::path::Path::new(file_path).exists() {
+        std::fs::File::create(file_path).unwrap();
+    }
+
+    std::fs::canonicalize(file_path)
         .unwrap()
         .to_str()
         .unwrap()
