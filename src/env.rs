@@ -7,7 +7,7 @@ pub fn add(work_dir: &str, name: &str, value: &str) -> Result<(), std::io::Error
     let mut env_file = std::fs::OpenOptions::new()
         .append(true)
         .open(get_env_path(work_dir))?;
-    env_file.write_all(format!("export {}={}\n", name, value).as_bytes())?;
+    env_file.write_all(format!("export {}='{}'\n", name, value).as_bytes())?;
     Ok(())
 }
 
@@ -21,7 +21,7 @@ pub fn list(work_dir: &str) -> Result<HashMap<String, String>, std::io::Error> {
         let line = &line["export ".len()..];
         map.insert(
             line.split('=').nth(0).unwrap().to_string(),
-            line.split('=').nth(1).unwrap().to_string(),
+            line.split('=').skip(1).collect::<Vec<&str>>().join("="),
         );
     }
     Ok(map)

@@ -10,7 +10,7 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    #[arg(short, long, default_value = "/var/lib/light-dragon")]
+    #[arg(short, long, default_value = "~/.local/share/light-dragon")]
     work_dir: String,
 }
 
@@ -55,7 +55,8 @@ enum Commands {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    cli.work_dir = shellexpand::tilde(&cli.work_dir).to_string();
 
     if !std::path::Path::new(&cli.work_dir).exists() {
         std::fs::create_dir(&cli.work_dir).unwrap();
