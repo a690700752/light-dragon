@@ -188,6 +188,23 @@ fn find_cron_files(
     Ok(files)
 }
 
+fn repo_dir(repo: &str, work_dir: &str) -> String {
+    format!("{}/repo/{}", work_dir, get_repo_name(repo))
+}
+
+fn list_fs_repos(work_dir: &str) -> Result<Vec<String>, std::io::Error> {
+    let mut repos = Vec::new();
+    let dir = format!("{}/repo", work_dir);
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            repos.push(path.file_name().unwrap().to_str().unwrap().to_string());
+        }
+    }
+    Ok(repos)
+}
+
 pub fn add(
     tabs: &mut Vec<crontab::Item>,
     repo: &str,
@@ -210,7 +227,7 @@ pub fn add(
         ));
     }
 
-    let repo_path = format!("{}/{}", work_dir, get_repo_name(repo));
+    let repo_path = repo_dir(repo, work_dir);
     clone_repo(repo, &repo_path, branch, force_clone)?;
 
     let files = find_cron_files(&repo_path, whitelist, violence)?;
@@ -267,12 +284,7 @@ pub fn add(
     Ok(())
 }
 
-pub fn rm_by_repo(
-    tabs: &Vec<crontab::Item>,
-    repo: &str,
-    work_dir: &str,
-    rm_files: bool,
-) -> Vec<crontab::Item> {
+pub fn rm_by_repo(tabs: &Vec<crontab::Item>, repo: &str) -> Vec<crontab::Item> {
     let res = tabs
         .iter()
         .filter(|i| {
@@ -284,20 +296,12 @@ pub fn rm_by_repo(
         .cloned()
         .collect();
 
-    if rm_files {
-        let repo_name = get_repo_name(repo);
-        if std::fs::remove_dir_all(format!("{}/{}", work_dir, repo_name)).is_err() {
-            println!("Warning: failed to remove repo: {}", &repo_name)
-        }
-    }
-
     res
 }
 
 pub fn rm_by_index(
     tabs: &Vec<crontab::Item>,
     index: usize,
-    work_dir: &str,
 ) -> Result<Vec<crontab::Item>, std::io::Error> {
     let repo_tabs = list(tabs);
     let t = repo_tabs.get(index);
@@ -310,7 +314,31 @@ pub fn rm_by_index(
     let t = t.unwrap();
 
     let repo = &t.args.as_ref().unwrap_left().name;
-    Ok(rm_by_repo(tabs, repo, work_dir, true))
+    Ok(rm_by_repo(tabs, repo))
+}
+
+fn rm_repo_files(work_dir: &str, repo: &str) {
+    let repo_name = get_repo_name(repo);
+    if std::fs::remove_dir_all(repo_dir(repo, work_dir)).is_err() {
+        println!("Warning: failed to remove repo: {}", &repo_name)
+    }
+}
+
+pub fn clean_files(tabs: &Vec<crontab::Item>, work_dir: &str) -> Result<(), std::io::Error> {
+    let tab_repos = list(tabs);
+    let fs_repos = list_fs_repos(work_dir)?;
+
+    for r in fs_repos {
+        if tab_repos
+            .iter()
+            .find(|i| i.args.as_ref().unwrap_left().name == r)
+            .is_none()
+        {
+            rm_repo_files(work_dir, &r);
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

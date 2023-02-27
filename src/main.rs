@@ -40,9 +40,11 @@ enum Commands {
         #[arg(short, long, default_value = "false")]
         violence: bool,
     },
-    /// Remove repo
+    /// Remove repo in crontab
     RepoRm { index: usize },
-    /// List repo
+    /// Clean unused repo files
+    RepoClean,
+    /// List repo in crontab
     RepoList,
     /// Sync repo's cron files
     RepoReadd,
@@ -86,8 +88,12 @@ fn main() {
         }
         Commands::RepoRm { index } => {
             let tabs = crontab::get().unwrap();
-            let tabs = repo::rm_by_index(&tabs, index, &cli.work_dir).unwrap();
+            let tabs = repo::rm_by_index(&tabs, index).unwrap();
             crontab::set(tabs).unwrap();
+        }
+        Commands::RepoClean => {
+            let tabs = crontab::get().unwrap();
+            repo::clean_files(&tabs, &cli.work_dir).unwrap();
         }
         Commands::RepoList => {
             let tabs = crontab::get().unwrap();
@@ -117,7 +123,7 @@ fn main() {
             for repo in repos {
                 let args = repo.args.as_ref().unwrap_left();
                 let repo_args = args.repo_args.as_ref().unwrap();
-                tabs = repo::rm_by_repo(&tabs, &args.name, &cli.work_dir, false);
+                tabs = repo::rm_by_repo(&tabs, &args.name);
 
                 repo::add(
                     &mut tabs,
