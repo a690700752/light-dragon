@@ -1,4 +1,6 @@
 mod crontab;
+mod dep_js;
+mod dep_py;
 mod env;
 mod repo;
 
@@ -41,7 +43,9 @@ enum Commands {
         violence: bool,
     },
     /// Remove repo in crontab
-    RepoRm { index: usize },
+    RepoRm {
+        index: usize,
+    },
     /// Clean unused repo files
     RepoClean,
     /// List repo in crontab
@@ -49,11 +53,32 @@ enum Commands {
     /// Sync repo's cron files
     RepoReadd,
     /// Add environment variable
-    EnvAdd { name: String, value: String },
+    EnvAdd {
+        name: String,
+        value: String,
+    },
     /// Remove environment variable
-    EnvRm { name: String },
+    EnvRm {
+        name: String,
+    },
     /// List environment variable
     EnvList,
+    DepJsList,
+    DepJsAdd {
+        name: String,
+        version: Option<String>,
+    },
+    DepJsRm {
+        name: String,
+    },
+    DepPyList,
+    DepPyAdd {
+        name: String,
+        version: Option<String>,
+    },
+    DepPyRm {
+        name: String,
+    },
 }
 
 fn main() {
@@ -146,6 +171,30 @@ fn main() {
             for (name, value) in map {
                 println!("{}={}", name, value);
             }
+        }
+        Commands::DepJsList => {
+            let m = dep_js::list(&cli.work_dir);
+            for (name, version) in m {
+                println!("{}={}", name, version);
+            }
+        }
+        Commands::DepJsAdd { name, version } => {
+            dep_js::add(&cli.work_dir, &name, version.as_deref()).unwrap();
+        }
+        Commands::DepJsRm { name } => {
+            dep_js::rm(&cli.work_dir, &name).unwrap();
+        }
+        Commands::DepPyList => {
+            let m = dep_py::list();
+            for (name, version) in m {
+                println!("{}={}", name, version);
+            }
+        }
+        Commands::DepPyAdd { name, version } => {
+            dep_py::add(&name, version.as_deref()).unwrap();
+        }
+        Commands::DepPyRm { name } => {
+            dep_py::rm(&name).unwrap();
         }
     }
 }
