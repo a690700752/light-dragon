@@ -3,7 +3,6 @@ mod env;
 mod repo;
 
 use clap::{Args, Parser, Subcommand};
-use crontab::Item;
 use rouille::router;
 use serde::Deserialize;
 
@@ -19,24 +18,14 @@ struct Cli {
 
 #[derive(Debug, Args, Deserialize)]
 struct RepoAddArg {
-    #[arg(value_parser = |v: &str| {
-            if v.starts_with("https://") || v.starts_with("git@") {
-                Ok(v.to_string())
-            } else {
-                Err("repo must start with https:// or git@".to_string())
-            }
-        })]
     repo: String,
 
     /// Regex for whitelist
-    #[arg(short, long, default_value = r".*\.ts$")]
     #[serde(default = "default_whitelist")]
     whitelist: String,
 
-    #[arg(short, long)]
     schedule: String,
 
-    #[arg(short, long, default_value = "master")]
     #[serde(default = "default_branch")]
     branch: String,
 }
@@ -65,24 +54,13 @@ struct EnvRmArg {
     name: String,
 }
 
+#[derive(Debug, Args, Deserialize)]
+struct ListTasksArg {
+    name: String,
+}
+
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Add repo
-    RepoAdd(RepoAddArg),
-    /// Remove repo in crontab
-    RepoRm(RepoRmArg),
-    /// Clean unused repo files
-    RepoClean,
-    /// List repo in crontab
-    RepoList,
-    /// Sync cron tasks by repo
-    TaskSync,
-    /// Add environment variable
-    EnvAdd(EnvAddArg),
-    /// Remove environment variable
-    EnvRm(EnvRmArg),
-    /// List environment variable
-    EnvList,
     Rpc {},
 }
 
@@ -93,11 +71,6 @@ fn cmd_repo_add(work_dir: &str, repo: &str, whitelist: &str, schedule: &str, bra
     )
     .unwrap();
     crontab::set(tabs).unwrap();
-}
-
-fn cmd_repo_list() -> Vec<Item> {
-    let tabs = crontab::get().unwrap();
-    repo::list(&tabs).into_iter().cloned().collect()
 }
 
 fn cmd_repo_rm(index: usize) {
@@ -140,47 +113,10 @@ fn main() {
     cli.work_dir = shellexpand::tilde(&cli.work_dir).to_string();
 
     if !std::path::Path::new(&cli.work_dir).exists() {
-        std::fs::create_dir(&cli.work_dir).unwrap();
+        std::fs::create_dir_all(&cli.work_dir).unwrap();
     }
 
     match cli.command {
-        Commands::RepoAdd(arg) => cmd_repo_add(
-            &cli.work_dir,
-            &arg.repo,
-            &arg.whitelist,
-            &arg.schedule,
-            &arg.branch,
-        ),
-        Commands::RepoRm(arg) => cmd_repo_rm(arg.index),
-        Commands::RepoClean => cmd_repo_clean(&cli.work_dir),
-        Commands::RepoList => {
-            let repos = cmd_repo_list();
-
-            for (i, repo) in repos.iter().enumerate() {
-                println!(
-                    "{}\t{}\t{}\t{}",
-                    i,
-                    repo.schedule,
-                    repo.args.as_ref().unwrap_left().name,
-                    repo.args
-                        .as_ref()
-                        .unwrap_left()
-                        .repo_args
-                        .as_ref()
-                        .unwrap()
-                        .whitelist,
-                )
-            }
-        }
-        Commands::TaskSync => cmd_repo_readd(&cli.work_dir),
-        Commands::EnvAdd(arg) => env::add(&cli.work_dir, &arg.name, &arg.value).unwrap(),
-        Commands::EnvRm(arg) => env::rm(&cli.work_dir, &arg.name).unwrap(),
-        Commands::EnvList => {
-            let map = env::list(&cli.work_dir).unwrap();
-            for (name, value) in map {
-                println!("{}={}", name, value);
-            }
-        }
         Commands::Rpc {} => rouille::start_server("localhost:8000", move |request| {
             router!(request,
                 (GET) (/) => {
@@ -192,8 +128,15 @@ fn main() {
                     response("null")
                 },
                 (POST) (/api/repo/list) => {
-                    let repos = cmd_repo_list();
-                    rouille::Response::json(&repos)
+                    let tabs = crontab::get().unwrap();
+                    let repos = repo::list(&tabs);
+                    response(&serde_json::to_string(&repos).unwrap())
+                },
+                (POST) (/api/repo/listTasks) => {
+                    let arg: ListTasksArg = rouille::try_or_400!(rouille::input::json_input(request));
+                    let tabs = crontab::get().unwrap();
+                    let tasks = repo::list_tasks(&tabs, &arg.name);
+                    response(&serde_json::to_string(&tasks).unwrap())
                 },
                 (POST) (/api/repo/rm) => {
                     let arg: RepoRmArg = rouille::try_or_400!(rouille::input::json_input(request));
@@ -220,7 +163,7 @@ fn main() {
                 },
                 (POST) (/api/env/list) => {
                     let map = env::list(&cli.work_dir).unwrap();
-                    rouille::Response::json(&map)
+                    response(&serde_json::to_string(&map).unwrap())
                 },
                 _ => rouille::Response::empty_404()
             )
@@ -230,7 +173,7 @@ fn main() {
 
 fn response(json: &str) -> rouille::Response {
     rouille::Response::from_data(
-        "application/json",
+        "application/json; charset=utf-8",
         format!("{{\"code\": 200, \"data\": {}}}", json),
     )
 }

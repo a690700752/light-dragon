@@ -2,7 +2,7 @@ import { Button, Input, Modal, Space, Table, notification } from "antd";
 import { ColumnsType } from "antd/es/table";
 import React from "react";
 import { Column, Row } from "./layouts";
-import { post, useQuery } from "./useQuery";
+import { post, usePost } from "./useQuery";
 
 function useAddModal(onAdd: () => void) {
 	const [isAddModalVisible, setIsAddModalVisible] = React.useState(false);
@@ -51,6 +51,7 @@ function useAddModal(onAdd: () => void) {
 					name for local repo)
 				</span>
 				<Input
+					defaultValue={inputsRef.current.repo}
 					onChange={(e) => {
 						inputsRef.current.repo = e.target.value;
 					}}
@@ -62,7 +63,7 @@ function useAddModal(onAdd: () => void) {
 						inputsRef.current.branch = e.target.value;
 					}}
 				/>
-				<span>schedule</span>
+				<span>update schedule</span>
 				<Input
 					defaultValue={inputsRef.current.schedule}
 					onChange={(e) => {
@@ -87,12 +88,82 @@ function useAddModal(onAdd: () => void) {
 	};
 }
 
-function getColumns(refresh: () => void) {
+function ListTasksModal(props: {
+	name: string;
+	onCancel: () => void;
+}) {
+	const { name, onCancel } = props;
+	const { data, loading } = usePost("/api/repo/listTasks", {
+		method: "POST",
+		json: {
+			name,
+		},
+		mapData: (d) => {
+			// rome-ignore lint/suspicious/noExplicitAny: <explanation>
+			d.forEach((element: any) => {
+				element.name = element.args.Left.name;
+			});
+			return d;
+		},
+	});
+
+	console.log("data", data);
+
+	return (
+		<Modal open={true} onCancel={onCancel} footer={null}>
+			<Table
+				dataSource={data}
+				loading={loading}
+				columns={[
+					{
+						title: "Name",
+						dataIndex: "name",
+						key: "name",
+					},
+					{
+						title: "Run",
+						dataIndex: "schedule",
+						key: "schedule",
+					},
+				]}
+			/>
+		</Modal>
+	);
+}
+
+const RepoManage: React.FC = () => {
+	const { data, loading, refresh } = usePost("/api/repo/list", {
+		method: "POST",
+		mapData: (d) => {
+			// rome-ignore lint/suspicious/noExplicitAny: <explanation>
+			d.forEach((element: any) => {
+				element.name = element.args.Left.name;
+			});
+			return d;
+		},
+	});
+
+	const { show: showAdd, renderModal: renderAddModal } = useAddModal(() => {
+		refresh();
+		notification.success({
+			message: "Success",
+			description: "add success",
+		});
+	});
+
+	const [taskListModal, setTaskListModal] = React.useState<{
+		name: string;
+		visible: boolean;
+	}>({
+		name: "",
+		visible: false,
+	});
+
 	// rome-ignore lint/suspicious/noExplicitAny: <explanation>
 	const columns: ColumnsType<any> = [
 		{
 			title: "Name",
-			dataIndex: ["args", "Left", "name"],
+			dataIndex: "name",
 			key: "name",
 		},
 		{
@@ -101,20 +172,31 @@ function getColumns(refresh: () => void) {
 			key: "branch",
 		},
 		{
-			title: "Schedule",
+			title: "Update",
 			dataIndex: "schedule",
 			key: "schedule",
 		},
 		{
 			title: "Whitelist",
 			dataIndex: ["args", "Left", "repo_args", "whitelist"],
-			key: "schedule",
+			key: "whitelist",
 		},
 		{
 			title: "Action",
 			key: "action",
 			render: (_, record, index) => (
 				<Space size="middle">
+					<Button
+						onClick={() => {
+							setTaskListModal({
+								name: record.name,
+								visible: true,
+							});
+						}}
+					>
+						Tasks
+					</Button>
+					<Button>Files</Button>
 					<Button
 						onClick={async () => {
 							try {
@@ -144,29 +226,13 @@ function getColumns(refresh: () => void) {
 		},
 	];
 
-	return columns;
-}
-
-const RepoManage: React.FC = () => {
-	const { data, loading, refresh } = useQuery("/api/repo/list", {
-		method: "POST",
-	});
-
-	const { show, renderModal } = useAddModal(() => {
-		refresh();
-		notification.success({
-			message: "Success",
-			description: "add success",
-		});
-	});
-
 	return (
 		<>
 			<Column>
 				<Row>
 					<Button
 						onClick={() => {
-							show();
+							showAdd();
 						}}
 					>
 						Add
@@ -174,12 +240,24 @@ const RepoManage: React.FC = () => {
 				</Row>
 				<Table
 					style={{ marginTop: 8 }}
-					columns={getColumns(refresh)}
+					columns={columns}
 					dataSource={data}
 					loading={loading}
+					rowKey="name"
 				/>
 			</Column>
-			{renderModal()}
+			{renderAddModal()}
+			{taskListModal.visible && (
+				<ListTasksModal
+					name={taskListModal.name}
+					onCancel={() => {
+						setTaskListModal({
+							name: "",
+							visible: false,
+						});
+					}}
+				/>
+			)}
 		</>
 	);
 };

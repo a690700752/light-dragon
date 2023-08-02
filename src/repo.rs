@@ -20,6 +20,10 @@ pub fn list(tabs: &Vec<crontab::Item>) -> Vec<&crontab::Item> {
     filter_by_group(tabs, GROUP_REPO)
 }
 
+pub fn list_tasks<'a>(tabs: &'a Vec<crontab::Item>, name: &str) -> Vec<&'a crontab::Item> {
+    filter_by_group(tabs, name)
+}
+
 fn get_repo_name(repo: &str) -> String {
     let parts = repo.split("/").collect::<Vec<_>>();
     let name = parts[parts.len() - 1];
@@ -208,19 +212,31 @@ pub fn add(
     }
 
     let repo_path = repo_dir(repo, work_dir);
-    clone_repo(repo, &repo_path, branch, force_clone)?;
+    let is_git_repo = repo.starts_with("http://") || repo.starts_with("https://");
+
+    if is_git_repo {
+        clone_repo(repo, &repo_path, branch, force_clone)?;
+    } else {
+        if !std::path::Path::new(&repo_path).exists() {
+            std::fs::create_dir_all(&repo_path)?;
+        }
+    }
 
     let files = find_cron_files(&repo_path, whitelist)?;
 
     let item = crontab::Item {
         schedule: schedule.to_string(),
-        cmd: format!(
-            "cd {} && git fetch origin {} && git reset --hard origin/{} && {} repo-readd",
-            resolve_to_abspath(&repo_path).unwrap(),
-            branch,
-            branch,
-            std::env::current_exe().unwrap().to_str().unwrap()
-        ),
+        cmd: if is_git_repo {
+            format!(
+                "cd {} && git fetch origin {} && git reset --hard origin/{} && {} repo-readd",
+                resolve_to_abspath(&repo_path).unwrap(),
+                branch,
+                branch,
+                std::env::current_exe().unwrap().to_str().unwrap()
+            )
+        } else {
+            ":".to_string()
+        },
         args: Left(crontab::ItemArgs {
             group: GROUP_REPO.to_string(),
             name: repo.to_string(),

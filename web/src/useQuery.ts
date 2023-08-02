@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 
-export function useQuery(input: RequestInfo | URL, init?: RequestInit) {
+export function usePost(
+	input: RequestInfo | URL,
+	init?: RequestInit & {
+		json?: object;
+		// rome-ignore lint/suspicious/noExplicitAny: <explanation>
+		mapData?: (data: any) => any;
+	},
+) {
+	const { mapData = (i: unknown) => i, ...restInit } = init || {};
 	const [state, setState] = useState<{
 		// rome-ignore lint/suspicious/noExplicitAny: <explanation>
 		data?: any;
@@ -12,9 +20,9 @@ export function useQuery(input: RequestInfo | URL, init?: RequestInit) {
 	const refresh = async () => {
 		setLoading(true);
 		try {
-			const res = await fetch(input, init);
+			const data = await post(input, restInit);
 			setState({
-				data: await res.json(),
+				data: mapData(data),
 			});
 		} catch (e) {
 			setState({
@@ -34,7 +42,7 @@ export function useQuery(input: RequestInfo | URL, init?: RequestInit) {
 export async function post(
 	input: RequestInfo | URL,
 	init?: RequestInit & {
-		json: object;
+		json?: object;
 	},
 ) {
 	const json = init?.json;
@@ -44,12 +52,12 @@ export async function post(
 			"Content-Type": "application/json",
 		},
 		...init,
-		body: JSON.stringify(json),
+		body: json ? JSON.stringify(json) : undefined,
 	});
 	const resJson = await res.json();
 	console.log("resJson", resJson);
 	if (resJson.code === 200) {
-		return resJson;
+		return resJson.data;
 	} else {
 		throw new Error(JSON.stringify(resJson));
 	}
