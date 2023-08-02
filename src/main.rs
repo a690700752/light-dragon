@@ -29,7 +29,7 @@ struct RepoAddArg {
     repo: String,
 
     /// Regex for whitelist
-    #[arg(short, long, default_value = r".*\.(sh|py|js)$")]
+    #[arg(short, long, default_value = r".*\.ts$")]
     #[serde(default = "default_whitelist")]
     whitelist: String,
 
@@ -39,22 +39,14 @@ struct RepoAddArg {
     #[arg(short, long, default_value = "master")]
     #[serde(default = "default_branch")]
     branch: String,
-
-    #[arg(short, long, default_value = "false")]
-    #[serde(default = "default_violence")]
-    violence: bool,
 }
 
 fn default_whitelist() -> String {
-    r".*\.(sh|py|js)$".to_string()
+    r".*\.ts$".to_string()
 }
 
 fn default_branch() -> String {
     "master".to_string()
-}
-
-fn default_violence() -> bool {
-    false
 }
 
 #[derive(Debug, Args, Deserialize)]
@@ -94,17 +86,10 @@ enum Commands {
     Rpc {},
 }
 
-fn cmd_repo_add(
-    work_dir: &str,
-    repo: &str,
-    whitelist: &str,
-    schedule: &str,
-    branch: &str,
-    violence: bool,
-) {
+fn cmd_repo_add(work_dir: &str, repo: &str, whitelist: &str, schedule: &str, branch: &str) {
     let mut tabs = crontab::get().unwrap();
     repo::add(
-        &mut tabs, repo, schedule, whitelist, work_dir, branch, false, violence,
+        &mut tabs, repo, schedule, whitelist, work_dir, branch, false,
     )
     .unwrap();
     crontab::set(tabs).unwrap();
@@ -144,7 +129,6 @@ fn cmd_repo_readd(work_dir: &str) {
             work_dir,
             &repo_args.branch,
             false,
-            repo_args.violence,
         )
         .unwrap();
     }
@@ -166,7 +150,6 @@ fn main() {
             &arg.whitelist,
             &arg.schedule,
             &arg.branch,
-            arg.violence,
         ),
         Commands::RepoRm(arg) => cmd_repo_rm(arg.index),
         Commands::RepoClean => cmd_repo_clean(&cli.work_dir),
@@ -205,8 +188,8 @@ fn main() {
                 },
                 (POST) (/api/repo/add) => {
                     let arg: RepoAddArg = rouille::try_or_400!(rouille::input::json_input(request));
-                    cmd_repo_add(&cli.work_dir, &arg.repo, &arg.whitelist, &arg.schedule, &arg.branch, arg.violence);
-                    rouille::Response::empty_204()
+                    cmd_repo_add(&cli.work_dir, &arg.repo, &arg.whitelist, &arg.schedule, &arg.branch);
+                    response("null")
                 },
                 (POST) (/api/repo/list) => {
                     let repos = cmd_repo_list();
@@ -215,25 +198,25 @@ fn main() {
                 (POST) (/api/repo/rm) => {
                     let arg: RepoRmArg = rouille::try_or_400!(rouille::input::json_input(request));
                     cmd_repo_rm(arg.index);
-                    rouille::Response::empty_204()
+                    response("null")
                 },
                 (POST) (/api/repo/clean) => {
                     cmd_repo_clean(&cli.work_dir);
-                    rouille::Response::empty_204()
+                    response("null")
                 },
                 (POST) (/api/repo/readd) => {
                     cmd_repo_readd(&cli.work_dir);
-                    rouille::Response::empty_204()
+                    response("null")
                 },
                 (POST) (/api/env/add) => {
                     let arg: EnvAddArg = rouille::try_or_400!(rouille::input::json_input(request));
                     env::add(&cli.work_dir, &arg.name, &arg.value).unwrap();
-                    rouille::Response::empty_204()
+                    response("null")
                 },
                 (POST) (/api/env/rm) => {
                     let arg: EnvRmArg = rouille::try_or_400!(rouille::input::json_input(request));
                     env::rm(&cli.work_dir, &arg.name).unwrap();
-                    rouille::Response::empty_204()
+                    response("null")
                 },
                 (POST) (/api/env/list) => {
                     let map = env::list(&cli.work_dir).unwrap();
@@ -243,4 +226,11 @@ fn main() {
             )
         }),
     }
+}
+
+fn response(json: &str) -> rouille::Response {
+    rouille::Response::from_data(
+        "application/json",
+        format!("{{\"code\": 200, \"data\": {}}}", json),
+    )
 }

@@ -9,22 +9,48 @@ export function useQuery(input: RequestInfo | URL, init?: RequestInit) {
 	}>({});
 	const [loading, setLoading] = useState(true);
 
+	const refresh = async () => {
+		setLoading(true);
+		try {
+			const res = await fetch(input, init);
+			setState({
+				data: await res.json(),
+			});
+		} catch (e) {
+			setState({
+				error: e,
+			});
+		}
+		setLoading(false);
+	};
+
 	useEffect(() => {
-		(async () => {
-			setLoading(true);
-			try {
-				const res = await fetch(input, init);
-				setState({
-					data: await res.json(),
-				});
-			} catch (e) {
-				setState({
-					error: e,
-				});
-			}
-			setLoading(false);
-		})();
+		refresh();
 	}, []);
 
-	return { ...state, loading };
+	return { ...state, loading, refresh };
+}
+
+export async function post(
+	input: RequestInfo | URL,
+	init?: RequestInit & {
+		json: object;
+	},
+) {
+	const json = init?.json;
+	const res = await fetch(input, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		...init,
+		body: JSON.stringify(json),
+	});
+	const resJson = await res.json();
+	console.log("resJson", resJson);
+	if (resJson.code === 200) {
+		return resJson;
+	} else {
+		throw new Error(JSON.stringify(resJson));
+	}
 }

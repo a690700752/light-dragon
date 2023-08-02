@@ -124,24 +124,9 @@ fn gen_launcher(file: &str) -> String {
     .to_string()
 }
 
-fn find_cron_in_file(file: &str, violence: bool) -> Result<String, std::io::Error> {
-    let filename = std::path::Path::new(file)
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap();
-
+fn find_cron_in_file(file: &str) -> Result<String, std::io::Error> {
     let mut re_list = vec![];
-    if !violence {
-        re_list.push((r"@cron +(.*)".to_string(), 1));
-    } else {
-        let binding = r#"[^\d\*]*(([\d\*]*[\*-/,\d]*[\d\*] ){4,5}[\d\*]*[\*-/,\d]*[\d\*])( |,|").*"#
-            .to_string() + filename;
-        re_list.push((binding, 1));
-
-        re_list.push((r"cron:(.*)".to_string(), 1));
-        re_list.push((r#"cron "(.*)""#.to_string(), 1));
-    }
+    re_list.push((r"@cron +(.*)".to_string(), 1));
 
     for (re, idx) in re_list {
         let re = regex::Regex::new(&re).unwrap();
@@ -168,15 +153,11 @@ fn find_cron_in_file(file: &str, violence: bool) -> Result<String, std::io::Erro
     ))
 }
 
-fn find_cron_files(
-    dir: &str,
-    whitelist: &str,
-    violence: bool,
-) -> Result<Vec<(String, String)>, std::io::Error> {
+fn find_cron_files(dir: &str, whitelist: &str) -> Result<Vec<(String, String)>, std::io::Error> {
     let files = find_files_by_regex(&dir, whitelist)?;
     let files: Vec<_> = files
         .iter()
-        .map(|f| (f, find_cron_in_file(&format!("{}/{}", dir, f), violence)))
+        .map(|f| (f, find_cron_in_file(&format!("{}/{}", dir, f))))
         .filter(|(f, cron)| {
             if cron.is_ok() {
                 println!("Info: found cron for file {}", f);
@@ -213,7 +194,6 @@ pub fn add(
     work_dir: &str,
     branch: &str,
     force_clone: bool,
-    violence: bool,
 ) -> Result<(), std::io::Error> {
     let repo_tabs = list(tabs);
     let f = repo_tabs
@@ -230,7 +210,7 @@ pub fn add(
     let repo_path = repo_dir(repo, work_dir);
     clone_repo(repo, &repo_path, branch, force_clone)?;
 
-    let files = find_cron_files(&repo_path, whitelist, violence)?;
+    let files = find_cron_files(&repo_path, whitelist)?;
 
     let item = crontab::Item {
         schedule: schedule.to_string(),
@@ -247,7 +227,6 @@ pub fn add(
             repo_args: Some(crontab::RepoArgs {
                 whitelist: whitelist.to_string(),
                 branch: branch.to_string(),
-                violence,
             }),
         }),
     };
