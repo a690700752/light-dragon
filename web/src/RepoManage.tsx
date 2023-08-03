@@ -3,6 +3,7 @@ import { ColumnsType } from "antd/es/table";
 import React from "react";
 import { Column, Row } from "./layouts";
 import { post, usePost } from "./useQuery";
+import { useNavigate } from "react-router-dom";
 
 function useAddModal(onAdd: () => void) {
 	const [isAddModalVisible, setIsAddModalVisible] = React.useState(false);
@@ -158,6 +159,7 @@ const RepoManage: React.FC = () => {
 		name: "",
 		visible: false,
 	});
+	const navigate = useNavigate();
 
 	// rome-ignore lint/suspicious/noExplicitAny: <explanation>
 	const columns: ColumnsType<any> = [
@@ -196,7 +198,13 @@ const RepoManage: React.FC = () => {
 					>
 						Tasks
 					</Button>
-					<Button>Files</Button>
+					<Button
+						onClick={() => {
+							navigate("/FileManage");
+						}}
+					>
+						Files
+					</Button>
 					<Button
 						onClick={async () => {
 							try {
