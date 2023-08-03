@@ -2,3 +2,27 @@
 
 POST {{baseurl}}/api/repo/list
 
+###
+POST {{baseurl}}/api/fs/ls
+Content-Type: application/json
+
+{
+    "path": "local"
+}
+
+###
+POST {{baseurl}}/api/fs/read
+Content-Type: application/json
+
+{
+    "path": "local/README.md"
+}
+
+###
+POST {{baseurl}}/api/fs/write
+Content-Type: application/json
+
+{
+    "path": "local/README.md",
+    "content": "Hello World"
+}

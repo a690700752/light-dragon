@@ -173,7 +173,7 @@ fn find_cron_files(dir: &str, whitelist: &str) -> Result<Vec<(String, String)>, 
     Ok(files)
 }
 
-fn repo_dir(repo: &str, work_dir: &str) -> String {
+fn get_repo_dir(repo: &str, work_dir: &str) -> String {
     format!("{}/repo/{}", work_dir, get_repo_name(repo))
 }
 
@@ -211,7 +211,7 @@ pub fn add(
         ));
     }
 
-    let repo_path = repo_dir(repo, work_dir);
+    let repo_path = get_repo_dir(repo, work_dir);
     let is_git_repo = repo.starts_with("http://") || repo.starts_with("https://");
 
     if is_git_repo {
@@ -314,7 +314,7 @@ pub fn rm_by_index(
 
 fn rm_repo_files(work_dir: &str, repo: &str) {
     let repo_name = get_repo_name(repo);
-    if std::fs::remove_dir_all(repo_dir(repo, work_dir)).is_err() {
+    if std::fs::remove_dir_all(get_repo_dir(repo, work_dir)).is_err() {
         println!("Warning: failed to remove repo: {}", &repo_name)
     }
 }
@@ -340,4 +340,7 @@ pub fn clean_files(tabs: &Vec<crontab::Item>, work_dir: &str) -> Result<(), std:
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
+
+    #[test]
+    fn test() {}
 }
